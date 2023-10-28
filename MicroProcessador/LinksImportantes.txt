@@ -1,0 +1,69 @@
+Links
+
+
+1 - Software
+
+Keil uVision
+https://www.keil.com/demo/eval/arm.htm
+
+STM32CubeProgrammer
+https://www.st.com/en/development-tools/stm32cubeprog.html
+
+Saleae Logic Analyser
+https://www.saleae.com/downloads/
+
+QtSerialMonitor
+https://github.com/mich-w/QtSerialMonitor
+
+
+STM32 Cube IDE
+https://www.st.com/en/development-tools/stm32cubeide.html
+
+STM32 ST-LINK Utility - somente para casos onde STM32CubeProgrammer nao funciona
+https://www.st.com/en/development-tools/stsw-link004.html
+
+
+
+2 - Hardware Design
+
+STM32 Blue Pill
+https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html
+
+STM32 Black Pill
+https://stm32-base.org/boards/STM32F411CEU6-WeAct-Black-Pill-V2.0
+
+ST-LINK V2 Debugger
+https://stm32-base.org/boards/Debugger-STM32F101C8T6-STLINKV2
+
+
+
+3 - Notas de aula e Tutoriais
+
+Arm Cortex-M Assembly Programming for Embedded Programmers
+https://nicerland.com/arm-asm-for-embedded/
+
+The STM32F103 Arm Microcontroller & Embedded Systems: Using Assembly & C
+https://nicerland.com/stm32f103/
+
+
+4 - ARM
+
+https://www.keil.com/dd/chip/4235.htm
+
+https://developer.arm.com/
+
+https://developer.arm.com/Processors/Cortex-M3
+
+https://developer.arm.com/Processors/Cortex-M4
+
+
+5 - ST
+
+https://www.st.com/en/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus.html?
+
+https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html
+
+
+6 - ARM CMSIS
+
+https://arm-software.github.io/CMSIS_5/latest/General/html/index.html
