@@ -58,42 +58,30 @@ LOOP
 	AND R4,R0,#0x01
 
 	; Inicio do algoritmo de controle
-	B CONTROLE_BOMBA1
 	
-CONTROLE_BOMBA1
-	AND R5, R1, R2 ;quando S1 e S2 pressionados R5 é 1
-	CMP R5, #1     ;se R5 é 1 tanque inferior está cheio
-	BEQ DESLIGA_BOMBA1 ;desliga_bomba1
-	B LIGA_BOMBA1   ;liga bomba_1
-	
-DESLIGA_BOMBA1 
-	MOV R11, #0
-	MOV R9, R11
-	B BOMBA2
-	
-LIGA_BOMBA1
+	;Inicio B2
+	AND R5, R1, R2
+	CMP R5, #1
+	BEQ DESLIGA
 	MOV R11, #1
 	MOV R9, R11
-	B CONTROLE_BOMBA1
+	B B2
+DESLIGA
+	MOV R11, #0
+	MOV R9, R11
 
-BOMBA2
+B2
 	;INICIO B2
-	AND R5, R3, R4     ;Se S3 ou S4 pressionado, nível do tanque superior alto
-    CMP R5, #1         ;Nível do tanque superior intermediário ou máximo
-	BEQ DESLIGA_BOMBA2   ;Ligue a bomba 2
-	CMP R3, #0           ;Se S3 nao pressionado, tanque inferior baixo
-	CMP R9, #0          ;E tanque inferior nivel intermediario
-	BEQ LIGA_BOMBA2     ;Ligue a bomba 2
-    B BOMBA2   
-	
-LIGA_BOMBA2
-	MOV R12, #1
-	B BOMBA2
-	
-DESLIGA_BOMBA2
+	MVN R6, R4
+	MVN R7, R3
+	AND R8, R6,R7
+	AND R6, R8, R1
+	CMP R6, #1
+	BEQ LIGA
 	MOV R12, #0
 	B FIM
-	
+LIGA
+	MOV R12, #1
 FIM
 	
 	; Fim do algoritmo de controle
