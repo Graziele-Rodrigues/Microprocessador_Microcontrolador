@@ -1,5 +1,5 @@
 	EXPORT __main 
-AREA	EXAMPLE4_3, CODE, READONLY
+	AREA	EXAMPLE4_3, CODE, READONLY
 __main	
 	MOV	R0, #0x55		; R0 = 0x55
 	MOV	R2, #16		; load 16 into R2 (outer loop count)

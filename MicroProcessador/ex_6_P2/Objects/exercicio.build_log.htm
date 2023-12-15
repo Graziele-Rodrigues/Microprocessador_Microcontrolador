@@ -27,12 +27,15 @@ Project File Date:  11/25/2023
 <h2>Output:</h2>
 *** Using Compiler 'V6.19', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
 Build target 'Target 1'
-"main.s", line 44: Warning: A1581W: Added 2 bytes of padding at address 0x22
-   44 00000024    AREA QUESTAO2_DATAR, DATA, READONLY
-0 Errors, 1 Warning
+"main.s", line 30 (column 10): Warning: A1865W: '#' not seen before constant expression
+   30 0000000e   MOV R0, 0x01
+                        ^
+"main.s", line 38: Warning: A1581W: Added 2 bytes of padding at address 0x1e
+   38 00000020  AREA MY_CODE_R, DATA, READONLY
+0 Errors, 2 Warnings
 assembling main.s...
 linking...
-Program Size: Code=52 RO-data=12 RW-data=404 ZI-data=0  
+Program Size: Code=44 RO-data=12 RW-data=400 ZI-data=0  
 ".\Objects\exercicio.axf" - 0 Error(s), 0 Warning(s).
 
 <h2>Software Packages used:</h2>
