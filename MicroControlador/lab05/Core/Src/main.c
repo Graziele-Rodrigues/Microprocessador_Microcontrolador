@@ -97,11 +97,36 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint8_t status=HAL_GPIO_ReadPin(GPIOB, CHAVE_Pin);
-	  if(__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){
-	    __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
-		  HAL_GPIO_TogglePin(GPIOC, LED_PCB_Pin);
-	  }
+	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE))
+	      {
+	          __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
+	          // Ler o estado da chave a cada 500ms
+	          static uint16_t chaveReadCounter = 0;
+	          if (chaveReadCounter >= 5) // 5 * 100ms = 500ms
+	          {
+	              chaveReadCounter = 0;
+	              uint8_t status = HAL_GPIO_ReadPin(GPIOB, CHAVE_Pin);
+
+	              if (status == 0)
+	              {
+	                  // Toggle LED a cada 100ms se a chave estiver pressionada
+	                  static uint16_t ledToggleCounter = 0;
+	                  if (ledToggleCounter >= 1) // 1 * 100ms = 100ms
+	                  {
+	                      ledToggleCounter = 0;
+	                      HAL_GPIO_TogglePin(GPIOC, LED_RED_Pin | LED_GREEN_Pin | LED_BLUE_Pin);
+	                  }
+	                  else
+	                  {
+	                      ledToggleCounter++;
+	                  }
+	              }
+	          }
+	          else
+	          {
+	              chaveReadCounter++;
+	          }
+	      }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -169,7 +194,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 7200-1;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1000-1;
+  htim1.Init.Period = 5000-1;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -212,14 +237,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_PCB_GPIO_Port, LED_PCB_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LED_RED_Pin|LED_GREEN_Pin|LED_BLUE_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : LED_PCB_Pin */
-  GPIO_InitStruct.Pin = LED_PCB_Pin;
+  /*Configure GPIO pin : LED_RED_Pin */
+  GPIO_InitStruct.Pin = LED_RED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(LED_PCB_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(LED_RED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LED_GREEN_Pin LED_BLUE_Pin */
+  GPIO_InitStruct.Pin = LED_GREEN_Pin|LED_BLUE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CHAVE_Pin */
   GPIO_InitStruct.Pin = CHAVE_Pin;
