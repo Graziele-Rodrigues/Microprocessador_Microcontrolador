@@ -41,12 +41,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-
+static uint16_t current_duty_cycle = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,17 +95,47 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+  HAL_TIM_Base_Start(&htim1);
+  HAL_ADCEx_Calibration_Start(&hadc1);
 
   /* USER CODE END 2 */
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
-    /* USER CODE END WHILE */
+    {
+	  HAL_ADC_Start(&hadc1);
+  	  HAL_ADC_PollForConversion(&hadc1, 1);
+  	  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
+  	  // Mapear o valor do potenciômetro para a faixa de 0-100
+  	  uint16_t duty_cycle = (adc_value * 100) / 4095;
 
-    /* USER CODE BEGIN 3 */
+  	  // Incrementar a largura de pulso em passos de 10% por segundo
+  	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
+  		  __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
+  		  if (current_duty_cycle < duty_cycle) {
+  			  current_duty_cycle += 10;
+  			  if (current_duty_cycle > duty_cycle) {
+  				  current_duty_cycle = duty_cycle;
+  			  }
+  		 } else if (current_duty_cycle > duty_cycle) {
+  			 current_duty_cycle -= 10;
+  			 if (current_duty_cycle < duty_cycle) {
+  				 current_duty_cycle = duty_cycle;
+  			 }
+  		  }
+  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, (htim4.Init.Period * current_duty_cycle) / 100);
+  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, (htim4.Init.Period * current_duty_cycle) / 100);
+  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, (htim4.Init.Period * current_duty_cycle) / 100);
+  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, (htim4.Init.Period * current_duty_cycle) / 100);
+  	  }
   }
+
   /* USER CODE END 3 */
 }
 
