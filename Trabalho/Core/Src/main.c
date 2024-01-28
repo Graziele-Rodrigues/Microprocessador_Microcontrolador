@@ -41,11 +41,15 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 static uint16_t current_duty_cycle = 0;
+volatile uint32_t pulse_count = 0;
+volatile uint32_t elapsed_time_ms = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,44 +104,71 @@ int main(void)
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_1);  // encoder
   HAL_ADCEx_Calibration_Start(&hadc1);
 
   /* USER CODE END 2 */
 
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-    {
-	  HAL_ADC_Start(&hadc1);
-  	  HAL_ADC_PollForConversion(&hadc1, 1);
-  	  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
-  	  // Mapear o valor do potenciômetro para a faixa de 0-100
-  	  uint16_t duty_cycle = (adc_value * 100) / 4095;
+  {
+	  	  // Acesse as variáveis pulse_count e elapsed_time_ms que contam pulsos obtidos a partir do encoder em função do tempo
+	      uint32_t current_pulse_count = pulse_count;
+	      uint32_t current_elapsed_time_ms = elapsed_time_ms;
 
-  	  // Incrementar a largura de pulso em passos de 10% por segundo
-  	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
-  		  __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
-  		  if (current_duty_cycle < duty_cycle) {
-  			  current_duty_cycle += 10;
-  			  if (current_duty_cycle > duty_cycle) {
-  				  current_duty_cycle = duty_cycle;
-  			  }
-  		 } else if (current_duty_cycle > duty_cycle) {
-  			 current_duty_cycle -= 10;
-  			 if (current_duty_cycle < duty_cycle) {
-  				 current_duty_cycle = duty_cycle;
-  			 }
-  		  }
-  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, (htim4.Init.Period * current_duty_cycle) / 100);
-  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, (htim4.Init.Period * current_duty_cycle) / 100);
-  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, (htim4.Init.Period * current_duty_cycle) / 100);
-  		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, (htim4.Init.Period * current_duty_cycle) / 100);
-  	  }
+	   	  // Incrementar a largura de pulso em passos de 10% por segundo
+	   	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
+	   		  __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
+
+	   		  HAL_ADC_Start(&hadc1);
+	   	      HAL_ADC_PollForConversion(&hadc1, 1);
+	   		  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
+	   		  // Mapear o valor do potenciômetro para a faixa de 0-100
+	   		  uint16_t duty_cycle = (adc_value * 100) / 4095;
+
+	   		  if (current_duty_cycle < duty_cycle) {
+	   			  current_duty_cycle += 10;
+	   			  if (current_duty_cycle > duty_cycle) {
+	   				  current_duty_cycle = duty_cycle;
+	   			  }
+	   		 } else if (current_duty_cycle > duty_cycle) {
+	   			 current_duty_cycle -= 10;
+	   			 if (current_duty_cycle < duty_cycle) {
+	   				 current_duty_cycle = duty_cycle;
+	   			 }
+	   		  }
+            // 10 = CCR/1000*100
+	   		TIM4->CCR1 = (current_duty_cycle*10);
+	   		TIM4->CCR2 = (current_duty_cycle*10);
+	   		TIM4->CCR3 = (current_duty_cycle*10);
+	   		TIM4->CCR4 = (current_duty_cycle*10);
+	   	  }
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
-
   /* USER CODE END 3 */
 }
+
+/**
+ * Função de interrupção para lidar com pulsos do encoder
+*/
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM1) {
+        pulse_count++;
+    }
+}
+
+/**
+ * Função para calcular o tempo decorrido
+*/
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM1) {
+        elapsed_time_ms++;  // Incrementa o tempo a cada segundo
+    }
+}
+
 
 /**
   * @brief System Clock Configuration
@@ -221,7 +252,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_2;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_239CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -246,6 +277,7 @@ static void MX_TIM1_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
 
   /* USER CODE BEGIN TIM1_Init 1 */
 
@@ -266,9 +298,21 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_IC_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim1, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -300,7 +344,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 72-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 1024-1;
+  htim4.Init.Period = 1000-1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
