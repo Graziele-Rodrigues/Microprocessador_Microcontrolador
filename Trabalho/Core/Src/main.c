@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+  **********
   * @file           : main.c
   * @brief          : Main program body
-  ******************************************************************************
+  **********
   * @attention
   *
   * Copyright (c) 2024 STMicroelectronics.
@@ -13,7 +13,7 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  ******************************************************************************
+  **********
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -46,7 +46,6 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-static uint16_t current_duty_cycle = 0;
 volatile uint32_t pulse_count = 0;
 volatile uint32_t elapsed_time_ms = 0;
 
@@ -101,8 +100,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+  //HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+  //HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_1);  // encoder
   HAL_ADCEx_Calibration_Start(&hadc1);
@@ -111,6 +110,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint16_t current_duty_cycle = 0;
+
   while (1)
   {
 	  	  // Acesse as variáveis pulse_count e elapsed_time_ms que contam pulsos obtidos a partir do encoder em função do tempo
@@ -124,25 +125,30 @@ int main(void)
 	   		  HAL_ADC_Start(&hadc1);
 	   	      HAL_ADC_PollForConversion(&hadc1, 1);
 	   		  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
-	   		  // Mapear o valor do potenciômetro para a faixa de 0-100
-	   		  uint16_t duty_cycle = (adc_value * 100) / 4095;
-
-	   		  if (current_duty_cycle < duty_cycle) {
-	   			  current_duty_cycle += 10;
-	   			  if (current_duty_cycle > duty_cycle) {
-	   				  current_duty_cycle = duty_cycle;
-	   			  }
-	   		 } else if (current_duty_cycle > duty_cycle) {
-	   			 current_duty_cycle -= 10;
+	   		  if(adc_value>2048){
+	   			// Mapear o valor do potenciômetro para a faixa de 0-100
+	   			uint16_t duty_cycle = ((adc_value) * 100) / 4095;
 	   			 if (current_duty_cycle < duty_cycle) {
-	   				 current_duty_cycle = duty_cycle;
-	   			 }
-	   		  }
-            // 10 = CCR/1000*100
-	   		TIM4->CCR1 = (current_duty_cycle*10);
-	   		TIM4->CCR2 = (current_duty_cycle*10);
-	   		TIM4->CCR3 = (current_duty_cycle*10);
-	   		TIM4->CCR4 = (current_duty_cycle*10);
+	   				 current_duty_cycle += 10;
+	   			} else if (current_duty_cycle > duty_cycle) {
+	   				current_duty_cycle -= 10;
+	   			}
+	   			// 10 = CCR/1000*100
+	   			TIM4->CCR1 = 0;
+	   			TIM4->CCR2 = (current_duty_cycle*10);
+
+	   		  } else{
+	   			// Mapear o valor do potenciômetro para a faixa de 0-100
+	   			uint16_t duty_cycle = ((adc_value) * 100) / 2048;
+	   			 if (current_duty_cycle < duty_cycle) {
+	   				 current_duty_cycle += 10;
+	   			 } else if (current_duty_cycle > duty_cycle) {
+	   				 current_duty_cycle -= 10;
+	   			}
+				// 10 = CCR/1000*100
+				TIM4->CCR1 = (current_duty_cycle*10);
+				TIM4->CCR2 = 0;
+	   		}
 	   	  }
     /* USER CODE END WHILE */
 
