@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "arm_math.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,8 +47,10 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
+
 volatile uint32_t pulse_count = 0;
 volatile uint32_t elapsed_time_ms = 0;
+arm_pid_instance_f32 pid_instance; // Instância do controlador PID
 
 /* USER CODE END PV */
 
@@ -57,6 +60,11 @@ static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
+uint32_t pid(uint32_t current_duty_cycle, uint32_t current_pulse_count);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -100,23 +108,23 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-  //HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-  //HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_IC_Start_IT(&htim1, TIM_CHANNEL_1);  // encoder
   HAL_ADCEx_Calibration_Start(&hadc1);
+
+  /* Inicializar o controlador PID */
+  arm_pid_init_f32(&pid_instance, 1);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint16_t current_duty_cycle = 0;
-
+  uint32_t current_duty_cycle = 0;
   while (1)
   {
-	  	  // Acesse as variáveis pulse_count e elapsed_time_ms que contam pulsos obtidos a partir do encoder em função do tempo
-	      uint32_t current_pulse_count = pulse_count;
-	      uint32_t current_elapsed_time_ms = elapsed_time_ms;
+	     // Acesse as variáveis pulse_count e elapsed_time_ms que contam pulsos obtidos a partir do encoder em função do tempo
+	     uint32_t current_pulse_count = pulse_count;
+	     uint32_t current_elapsed_time_ms = elapsed_time_ms;
 
 	   	  // Incrementar a largura de pulso em passos de 10% por segundo
 	   	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
@@ -125,28 +133,33 @@ int main(void)
 	   		  HAL_ADC_Start(&hadc1);
 	   	      HAL_ADC_PollForConversion(&hadc1, 1);
 	   		  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
+
 	   		  if(adc_value>2048){
 	   			// Mapear o valor do potenciômetro para a faixa de 0-100
-	   			uint16_t duty_cycle = ((adc_value) * 100) / 4095;
+	   			uint32_t duty_cycle = ((adc_value) * 100) / 4095;
 	   			 if (current_duty_cycle < duty_cycle) {
 	   				 current_duty_cycle += 10;
 	   			} else if (current_duty_cycle > duty_cycle) {
 	   				current_duty_cycle -= 10;
 	   			}
+
+	   			uint32_t motor_output = pid(current_duty_cycle, current_pulse_count);
 	   			// 10 = CCR/1000*100
 	   			TIM4->CCR1 = 0;
-	   			TIM4->CCR2 = (current_duty_cycle*10);
+	   			TIM4->CCR2 = (motor_output*10); //antes estava current_duty_cycle*10
 
 	   		  } else{
 	   			// Mapear o valor do potenciômetro para a faixa de 0-100
-	   			uint16_t duty_cycle = ((adc_value) * 100) / 2048;
+	   			uint32_t duty_cycle = ((adc_value) * 100) / 2048;
 	   			 if (current_duty_cycle < duty_cycle) {
 	   				 current_duty_cycle += 10;
 	   			 } else if (current_duty_cycle > duty_cycle) {
 	   				 current_duty_cycle -= 10;
 	   			}
+
+	   			uint32_t motor_output = pid(current_duty_cycle, pulse_count);
 				// 10 = CCR/1000*100
-				TIM4->CCR1 = (current_duty_cycle*10);
+				TIM4->CCR1 = (motor_output*10); //antes estava current_duty_cycle*10
 				TIM4->CCR2 = 0;
 	   		}
 	   	  }
@@ -155,6 +168,28 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
+
+
+/**
+ * Funçoes pid control
+*/
+uint32_t pid(uint32_t current_duty_cycle, uint32_t current_pulse_count){
+	    uint16_t desired_output = current_duty_cycle;
+
+	    // Obter a saída real dos motores (pode ser a leitura do encoder, por exemplo)
+	    uint16_t actual_output = current_pulse_count;
+
+	    // Calcular o erro entre a saída desejada e a saída real dos motores
+	    int error = desired_output - actual_output;
+
+	    // Calcular a saída do controlador PID com base no erro
+	    float32_t pid_output = arm_pid_f32(&pid_instance, error);
+
+	    // Aplicar a saída do controlador PID para ajustar a saída dos motores
+	    uint32_t motor_output = desired_output + (uint16_t)(pid_output);
+	    return motor_output;
 }
 
 /**
@@ -174,7 +209,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         elapsed_time_ms++;  // Incrementa o tempo a cada segundo
     }
 }
-
 
 /**
   * @brief System Clock Configuration
