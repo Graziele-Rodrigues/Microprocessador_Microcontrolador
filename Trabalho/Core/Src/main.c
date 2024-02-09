@@ -18,11 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "arm_math.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +45,8 @@ ADC_HandleTypeDef hadc1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 
+UART_HandleTypeDef huart3;
+
 /* USER CODE BEGIN PV */
 
 volatile uint32_t pulse_count = 0;
@@ -60,13 +61,11 @@ static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
-
+static void MX_USART3_UART_Init(void);
+/* USER CODE BEGIN PFP */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 uint32_t pid(uint32_t current_duty_cycle, uint32_t current_pulse_count);
-
-/* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -105,6 +104,7 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
@@ -120,57 +120,79 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t current_duty_cycle = 0;
+
   while (1)
   {
 	     // Acesse as variáveis pulse_count e elapsed_time_ms que contam pulsos obtidos a partir do encoder em função do tempo
 	     uint32_t current_pulse_count = pulse_count;
 	     uint32_t current_elapsed_time_ms = elapsed_time_ms;
+	     // Receber mensagem serial
+	     char received_char;
+	     if (HAL_UART_Receive(&huart3, (uint8_t*)&received_char, 1, 100) == HAL_OK){
+	    	 switch (received_char)
+	    	 {
+	                 case 'r':
+	                     // Aumentar a aceleração do motor
+	                	 TIM4->CCR1 = 1000; //antes estava current_duty_cycle*10
+	                	 TIM4->CCR2 = 0;	                     break;
+	                 case 'l':
+	                	 TIM4->CCR1 = 1000; //antes estava current_duty_cycle*10
+	                	 TIM4->CCR2 = 0;
+	                     break;
+	                 case 's':
+	                	  // stop
+	                	 TIM4->CCR1 = 0; //antes estava current_duty_cycle*10
+	                	 TIM4->CCR2 = 0;
+	                	break;
+	                 default:
+	                     // Comando inválido
+	                     break;
+	             }
+	         }else{
+				  // Incrementar a largura de pulso em passos de 10% por segundo
+				  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
+					  __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
 
-	   	  // Incrementar a largura de pulso em passos de 10% por segundo
-	   	  if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)){ //para atualizar a cada 1 segundo
-	   		  __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_UPDATE);
+					  HAL_ADC_Start(&hadc1);
+					  HAL_ADC_PollForConversion(&hadc1, 1);
+					  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
 
-	   		  HAL_ADC_Start(&hadc1);
-	   	      HAL_ADC_PollForConversion(&hadc1, 1);
-	   		  uint16_t adc_value = HAL_ADC_GetValue(&hadc1);
+					  if(adc_value>2048){
+						// Mapear o valor do potenciômetro para a faixa de 0-100
+						uint32_t duty_cycle = ((adc_value) * 100) / 4095;
+						 if (current_duty_cycle < duty_cycle) {
+							 current_duty_cycle += 10;
+						} else if (current_duty_cycle > duty_cycle) {
+							current_duty_cycle -= 10;
+						}
 
-	   		  if(adc_value>2048){
-	   			// Mapear o valor do potenciômetro para a faixa de 0-100
-	   			uint32_t duty_cycle = ((adc_value) * 100) / 4095;
-	   			 if (current_duty_cycle < duty_cycle) {
-	   				 current_duty_cycle += 10;
-	   			} else if (current_duty_cycle > duty_cycle) {
-	   				current_duty_cycle -= 10;
-	   			}
+						uint32_t motor_output = pid(current_duty_cycle, current_pulse_count);
+						// 10 = CCR/1000*100
+						TIM4->CCR1 = 0;
+						TIM4->CCR2 = (motor_output*10); //antes estava current_duty_cycle*10
 
-	   			uint32_t motor_output = pid(current_duty_cycle, current_pulse_count);
-	   			// 10 = CCR/1000*100
-	   			TIM4->CCR1 = 0;
-	   			TIM4->CCR2 = (motor_output*10); //antes estava current_duty_cycle*10
+					  } else{
+						// Mapear o valor do potenciômetro para a faixa de 0-100
+						uint32_t duty_cycle = ((adc_value) * 100) / 2048;
+						 if (current_duty_cycle < duty_cycle) {
+							 current_duty_cycle += 10;
+						 } else if (current_duty_cycle > duty_cycle) {
+							 current_duty_cycle -= 10;
+						}
 
-	   		  } else{
-	   			// Mapear o valor do potenciômetro para a faixa de 0-100
-	   			uint32_t duty_cycle = ((adc_value) * 100) / 2048;
-	   			 if (current_duty_cycle < duty_cycle) {
-	   				 current_duty_cycle += 10;
-	   			 } else if (current_duty_cycle > duty_cycle) {
-	   				 current_duty_cycle -= 10;
-	   			}
-
-	   			uint32_t motor_output = pid(current_duty_cycle, pulse_count);
-				// 10 = CCR/1000*100
-				TIM4->CCR1 = (motor_output*10); //antes estava current_duty_cycle*10
-				TIM4->CCR2 = 0;
-	   		}
-	   	  }
+						uint32_t motor_output = pid(current_duty_cycle, pulse_count);
+						// 10 = CCR/1000*100
+						TIM4->CCR1 = (motor_output*10); //antes estava current_duty_cycle*10
+						TIM4->CCR2 = 0;
+					}
+				  }
+	         }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
-
-
 
 /**
  * Funçoes pid control
@@ -209,7 +231,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         elapsed_time_ms++;  // Incrementa o tempo a cada segundo
     }
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -430,6 +451,39 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 2 */
   HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
 
 }
 
